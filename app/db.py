@@ -2,18 +2,23 @@
 import hashlib
 import os
 import sqlite3
+from contextlib import contextmanager
 from pathlib import Path
 
 DB_PATH = os.getenv("DATABASE_PATH", "billing.db")
 SCHEMA = Path(__file__).resolve().parent.parent / "migrations" / "001-initial.sql"
 
 
+@contextmanager
 def connect():
     db = sqlite3.connect(DB_PATH, timeout=10, isolation_level=None)
     db.row_factory = sqlite3.Row
     db.execute("PRAGMA foreign_keys=ON")
     db.execute("PRAGMA busy_timeout=10000")
-    return db
+    try:
+        yield db
+    finally:
+        db.close()
 
 
 def migrate():
