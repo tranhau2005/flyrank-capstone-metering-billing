@@ -9,3 +9,5 @@ Run `python -m unittest discover -s tests -v`. The local test suite exercises:
 - `test_report_is_background_and_tenant_scoped` and `test_retry_and_failed_state`: pending-to-done behavior, isolation, bounded retries and an error log after final failure.
 
 Still required before claiming full completion: run a Stripe test Checkout with real test credentials and CLI, capture the signed event/replay proof, and verify a clean-machine setup. See README for configuration. Tests verify local behavior, not deployment or payment processing.
+
+On 2026-11-11, a read-only request using the configured Stripe test key successfully retrieved the configured active, recurring, test-mode Price. No checkout or payment was created by that check. This verifies the key and Price pairing, not the Checkout or webhook flow.
