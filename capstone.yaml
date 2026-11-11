@@ -1,0 +1,12 @@
+run: ./run.sh
+seed: python -m app.seed
+test: python -m unittest discover -s tests -v
+base_url: http://127.0.0.1:8000
+endpoints:
+  health: GET /health
+  generate: POST /generate
+  usage: GET /usage
+  checkout: POST /checkout
+  stripe_webhook: POST /webhooks/stripe
+  report: POST /reports
+  report_status: GET /reports/{id}

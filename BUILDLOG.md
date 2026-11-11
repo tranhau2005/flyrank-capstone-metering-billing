@@ -1,0 +1,3 @@
+# Build log
+
+This project was built with an AI assistant. The assistant developed the design, code, documentation and tests. A first webhook test exposed that current Stripe Python objects do not implement `dict.get`; the implementation was changed to convert Stripe objects to dictionaries. An early SQLite test exposed connections not closing when used directly as context managers; the connection helper now closes them. The Stripe retrieval is substituted in local webhook tests, so a real test-mode Checkout remains outstanding. The intern should review, run, and understand the code and tests before presenting or submitting the work.
