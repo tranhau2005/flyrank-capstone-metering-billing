@@ -57,26 +57,27 @@ def process_event(event):
     if not subscription_id:
         raise ValueError("Event does not identify a subscription")
     configure_stripe()
-    sub = stripe.Subscription.retrieve(subscription_id)
-    if hasattr(sub, "to_dict"):
-        sub = sub.to_dict()
-    tenant_id = (sub.get("metadata") or {}).get("tenant_id")
-    customer_id = sub.get("customer")
-    status = sub.get("status")
-    if not tenant_id or not customer_id or not status:
-        raise ValueError("Subscription missing tenant, customer or status")
-    items = (sub.get("items") or {}).get("data", [])
-    pro_price = setting("STRIPE_PRO_PRICE_ID")
-    has_pro = any((item.get("price") or {}).get("id") == pro_price for item in items)
-    plan = "pro" if has_pro and status in ("active", "trialing") else "free"
+    # Serialize reconciliation as well as the write. If two events arrive out of
+    # order, each retrieves the current state after the previous update commits.
     with connect() as db:
         db.execute("BEGIN IMMEDIATE")
         if db.execute("SELECT 1 FROM stripe_events WHERE event_id=?", (event_id,)).fetchone():
             db.commit()
             return False
+        sub = stripe.Subscription.retrieve(subscription_id)
+        if hasattr(sub, "to_dict"):
+            sub = sub.to_dict()
+        tenant_id = (sub.get("metadata") or {}).get("tenant_id")
+        customer_id = sub.get("customer")
+        status = sub.get("status")
+        if not tenant_id or not customer_id or not status:
+            raise ValueError("Subscription missing tenant, customer or status")
+        items = (sub.get("items") or {}).get("data", [])
+        pro_price = setting("STRIPE_PRO_PRICE_ID")
+        has_pro = any((item.get("price") or {}).get("id") == pro_price for item in items)
+        plan = "pro" if has_pro and status in ("active", "trialing") else "free"
         existing = db.execute("SELECT stripe_customer_id FROM subscriptions WHERE tenant_id=?", (tenant_id,)).fetchone()
         if existing is None or (existing["stripe_customer_id"] and existing["stripe_customer_id"] != customer_id):
-            db.rollback()
             raise ValueError("Subscription does not match a known tenant")
         db.execute("UPDATE subscriptions SET plan=?, status=?, stripe_customer_id=?, stripe_subscription_id=? WHERE tenant_id=?", (plan, status, customer_id, subscription_id, tenant_id))
         db.execute("INSERT INTO stripe_events VALUES (?,?)", (event_id, datetime.now(timezone.utc).isoformat()))

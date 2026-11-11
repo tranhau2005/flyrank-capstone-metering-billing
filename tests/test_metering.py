@@ -49,6 +49,16 @@ class MeteringTests(unittest.TestCase):
             connection.execute("UPDATE subscriptions SET status='unpaid' WHERE tenant_id='b'")
         self.assertEqual(self.post("unpaid", tenant_key=KEY_B).status_code, 402)
 
+    def test_concurrent_distinct_keys_cannot_exceed_quota(self):
+        with db.connect() as connection:
+            connection.execute("UPDATE plans SET monthly_calls=1 WHERE name='free'")
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            responses = list(pool.map(lambda i: metering.record("a", f"key-{i}", PAYLOAD), range(8)))
+        self.assertEqual(sum(status == 200 for status, _ in responses), 1)
+        self.assertEqual(sum(status == 429 for status, _ in responses), 7)
+        with db.connect() as connection:
+            self.assertEqual(connection.execute("SELECT count(*) FROM usage_events").fetchone()[0], 1)
+
     def test_concurrent_retries_record_once(self):
         with ThreadPoolExecutor(max_workers=8) as pool:
             responses = list(pool.map(lambda _: metering.record("a", "same-key", PAYLOAD), range(8)))
